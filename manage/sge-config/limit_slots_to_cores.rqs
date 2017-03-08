@@ -1,0 +1,6 @@
+{
+   name         limit_slots_to_cores
+   description  "Prevents core oversubscription across queues."
+   enabled      TRUE
+   limit        hosts {*} to slots=$num_proc
+}

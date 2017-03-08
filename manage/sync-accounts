@@ -1,0 +1,4 @@
+#!/bin/bash
+
+rocks sync users && make -C /var/411 && /root/bin/cfork "/opt/rocks/bin/411get --all"
+

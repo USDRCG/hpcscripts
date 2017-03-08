@@ -1,0 +1,23 @@
+
+# disable all queues
+echo "Disabling all queues"
+qmod -d '*'
+
+# if user list 'empty' does not exist, create it with qconf -mu empty
+# It will bring up an editor with this file:
+#
+# name empty
+# type ACL DEPT
+# fshare 0
+# oticket 0
+# entries NONE
+#
+# make no changes and save the file.
+
+# change user_lists none to user_lists empty
+echo "To disable new job submissions change 'user_lists none' to 'user_lists empty' in the following file."
+read -p "Press Enter to edit the file"
+qconf -mconf
+
+echo
+echo "Test the new configuration by running 'qsub -b y /bin/sleep 1' as a regular user"

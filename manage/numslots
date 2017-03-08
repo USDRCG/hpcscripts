@@ -1,0 +1,5 @@
+#!/bin/bash
+
+user=$1
+
+\qstat -u $user -s r| grep -v "^job|^-" | awk '{sum+=$9}END{print sum}'

@@ -1,0 +1,12 @@
+
+# enable all queues
+echo "Enabling all queues"
+qmod -e '*'
+
+# change user_lists empty to user_lists none (or whatever the default should be)
+echo "To enable new job submissions change 'user_lists empty' to 'user_lists none' in the following file."
+read -p "Press Enter to edit the file"
+qconf -mconf
+
+echo
+echo "Test the new configuration by running 'qsub -b y /bin/sleep 1' as a regular user"

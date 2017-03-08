@@ -1,0 +1,10 @@
+#!/bin/bash
+
+for u in `find /scratch/ -ls | awk '{print $5}' | uniq`; do
+        ps -u $u >/dev/null 2>&1;
+        if [ "$?" -ne 0 ]; then
+                echo "No processes for $u, deleting /scratch files"
+		find /scratch/ -user $u -exec rm -Rf {} \;
+        fi
+done
+

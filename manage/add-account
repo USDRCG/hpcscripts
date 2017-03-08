@@ -1,0 +1,48 @@
+#!/bin/bash
+# addnewuser
+# adds a new user to rio, generating appropriate commands to set up the user's home directory storage on nile
+#
+
+username=$1
+groupname=$username
+
+# pam_krb5 requires * in password field
+useradd -p '*' -M -d /home/$username $username
+#for access to gaussian:
+#useradd -p '*' -M -G gaussian -d /home/$username $username
+
+uid=`grep $username /etc/passwd | cut -d: -f3`
+gid=$uid
+
+echo "$username	nfs-nile:/export/home/$username" >>/etc/auto.home
+
+echo "Syncing configuration to compute nodes"
+rocks sync users
+make -C /var/411
+cluster-fork "411get --all"
+ssh l0-0 "411get --all" # cluster-fork doesn't hit the login node
+echo
+
+echo "Allocating home directory"
+# post science dmz, cant talk to nile.usd.edu from rio, csci vlan
+#ssh nile.usd.edu <<EOF
+ssh nfs-nile <<EOF
+shares select home
+filesystem $username
+set root_user=$uid
+set root_group=$gid
+set root_permissions=700
+set quota=250G
+commit
+exit
+EOF
+
+echo "Setting up dotfiles"
+su - $username -c "cp -R /etc/skel/.??* ~"
+
+echo "Testing node connectivity"
+su - $username -c "cluster-fork hostname"
+
+echo "$username added with group $groupname uid:gid=$uid:$gid"
+echo
+
