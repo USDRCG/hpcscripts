@@ -1,0 +1,3 @@
+spack purge --stage
+spack purge --downloads
+spack purge --misc-cache
