@@ -1,0 +1,52 @@
+#!/bin/bash
+
+USERNAME="$1"
+USERID="$2"
+GROUPID="$3"
+
+if [ $# -ne 3 ]; then
+	echo
+	echo "Usage: $0 <username> <uid> <gid>"
+	echo "Where <username> is a valid hpc.usd.edu user name, and <uid> and <gid> are valid on hpc.usd.edu"
+	echo
+	exit 1
+fi
+
+#if [ $(grep -c $USERID /etc/passwd) -ne 0 ]; then
+if [ $(cut -d':' -f3 /etc/passwd | grep -c $USERID) -ne 0 ]; then
+	echo
+	echo "User ID $USERID already exists:"
+	grep $USERID /etc/passwd
+	echo
+	exit 2
+fi
+
+if [ $(grep -c $GROUPID /etc/group) -ne 0 ]; then
+	echo
+	echo "Group ID $USERID already exists:"
+	grep $GROUPID /etc/group
+	echo
+	exit 2
+fi
+
+if [ $(grep -c $USERNAME /etc/passwd) -ne 0 ]; then
+	echo
+	echo "User $USERNAME already exists:"
+	grep $USERNAME /etc/passwd
+	echo
+	exit 2
+fi
+
+if [ $(grep -c $USERNAME /etc/group) -ne 0 ]; then
+	echo
+	echo "Group $USERNAME already exists:"
+	grep $USERNAME /etc/group
+	echo
+	exit 2
+fi
+
+echo "Adding user $USERNAME with USERID $USERID and GROUPID $GROUPID"
+
+groupadd $USERNAME --gid $GROUPID
+useradd  --shell /sbin/nologin --no-create-home --gid $GROUPID --uid $USERID $USERNAME
+
