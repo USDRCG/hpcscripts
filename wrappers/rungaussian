@@ -1,0 +1,314 @@
+#!/bin/bash
+# $Id: rungaussian,v 1.11 2013/09/30 14:11:42 djennewe Exp $
+# $Name:  $
+
+# Schedules a Gaussian job on a compute node
+# Gaussian jobs are SMP-parallel.  They can use multiple cores on a single machine.
+
+# Gaussian input files should specify the number of processors to use 
+# with %NprocShared=X and specify memory requirements with %Mem=Y
+
+### GLOBALS #####################################################################################
+# Email address to which job alerts are sent, this can also be set in a login script such as .bash_profile
+export JOB_EMAIL=""
+
+# Max number of procs allowed for a single submission
+# Gaussian jobs are all run on a single node, and no node has more than 12 procs
+declare -r MAXPROCS=24
+
+# Default number of procs used if num procs not specified or invalid
+declare -r DEFAULTPROCS=1
+
+# Maximum memory request
+declare -r MAXMEM="95GB"
+
+#Default memory request
+declare -r DEFAULTMEM="1GB"
+
+# Default scratch disk reauest
+declare -r DEFAULTSCR="1GB"
+
+# empty = false, 1 = true
+declare -r DEBUG=
+
+### FUNCTIONS #####################################################################################
+# Print program usage syntax and examples
+function usage {
+        echo
+        echo "usage: $0 <input file name>"
+        echo
+		echo "NOTES"
+		echo "* Scratch disk may be requested after the input file name with -s,  \"rungaussian myinput -s 10G\""
+		echo "* If no scratch disk is specified, $DEFAULTSCR is used."
+		echo "* Your Gaussian input file should contain a %NProcShared line requesting a specific number of processors."
+		echo "* It should also contain a %Mem line requesting a specific amount of memory (100MB, 2GB, etc)."
+        echo "* If the number of processors is not specified $DEFAULTPROCS processor is used."
+        echo "* If memory is not specified $DEFAULTMEM is used."
+		echo "* No more than $MAXPROCS processors and $MAXMEM memory may be requested by a single Gaussian job."
+        echo "* A Gaussian input file requesting 4 processors and 2.5 GB of memory would contain the following two lines:"
+		echo "    %NProcShared=4"
+		echo "    %Mem=2.5GB"
+		echo
+        echo "EXAMPLES"
+        echo "To run Gaussian on the file myinput:"
+        echo "$0 myinput"
+		echo
+        echo "To run Gaussian on the file myinput, requesting 10 GB of scratch disk:"
+        echo "$0 myinput -s 10G"
+}
+
+# Sainty check on memory request
+# $1 IN "M", "G", etc
+# $2 IN "B", "W", etc
+function verifyMemUnit {
+	local mult="$1"
+	local unit="$2"
+
+	if [ $mult != "K" ] && [ $mult != "M" ] && [ $mult != "G" ] && [ $unit != "W" ] && [ $unit != "B" ]; then
+		echo "Invalid memory request: $memStr"
+		echo "Memory request must be in KB, MB, GB, KW, MW, or GW"
+		exit 1
+	fi
+}
+
+# $1 IN name of a gaussian input file
+# $2 IN number of processing cores requested 
+# $3 OUT memory per core requested, in (K|M|G)Bytes
+function getMem {
+	local file="$1"
+	local procs="$2"
+	local __memPerProc="$3"
+
+	local memStr
+	local memunit
+	local mult
+	local unit
+	local memAmt
+	local memPerProc
+	local tstMem
+	local tstMax
+
+	memStr=`grep -i %Mem $file | cut -d'=' -f2 | tr -d '[:space:]'`
+	[ $DEBUG ] && echo "Mem requested in input file: $memStr"
+
+	if [ -z "$memStr" ]; then
+		echo "No %Mem line found in $file.  Requesting $DEFAULTMEM."
+		memStr="$DEFAULTMEM"
+	fi
+
+	# memStr = memAmt $mult$unit (eg 100 GB --> memAmt=100, mult=G, unit=B)
+	# convert mem units to upper: KB,MB,GB,KW,MW,GW
+	memunit=`echo ${memStr:(-2)} | tr -d '[:digit:]' | tr '[:lower:]' '[:upper:]'`
+	[ $DEBUG ] && echo "mem unit: $memunit"
+
+	# if no memunits specified assume DWords
+	if [ -z "$memunit" ]; then
+		mult=""
+		unit="W"
+	else
+		# K, M, G ?
+		mult=${memunit:0:1}
+		[ $DEBUG ] && echo "mult: $mult"
+	
+		# Are we using words or bytes?
+		unit=${memunit:1:1}
+		[ $DEBUG ] && echo "unit: $unit"
+	fi
+
+	if [ ! -z "$memunit" ]; then
+		verifyMemUnit $mult $unit
+	fi
+
+### Calculate mem amount
+	memAmt=`echo $memStr | tr -d '[:alpha:]'`
+    # Turn DWords into Bytes, 4 bytes = 1 word, 8 bytes = 1DWord 
+	# 8 * words = bytes
+	if [ "$unit" = "W" ]; then
+		let "memAmt = $memAmt * 8";
+		unit="B"
+	fi
+
+	# Turn bare bytes into MB
+	if [ -z "$mult" ]; then
+		memAmt=`echo "scale=1;$memAmt/(1024*1024)" | /usr/bin/bc`
+		mult="M"
+	fi
+
+	# Assert($unit == "B")
+	echo "$memAmt ${mult}$unit total memory requested."
+
+
+# Convert everything to bytes and test against max (testing ints is easier than reals)
+	let "tstMax = ${MAXMEM:0:2} * 1024 * 1024 * 1024"
+	tstMem=$memAmt
+	if [ $mult = "K" ]; then
+		let "tstMem = $tstMem * 1024"
+	elif [ $mult = "M" ]; then
+		let "tstMem = $tstMem * 1024 * 1024"
+	elif [ $mult = "G" ]; then
+		let "tstMem = $tstMem * 1024 * 1024 * 1024"
+	fi
+
+	if [ $tstMem -gt $tstMax ]; then
+		echo
+		echo "Requested memory must be less than $MAXMEM"
+		usage
+		exit 1
+	fi
+
+	memPerProc=`echo "scale=1;$memAmt/$procs" | /usr/bin/bc`$mult
+
+	# "return"
+	eval $__memPerProc="'$memPerProc'"
+}
+
+# $1 IN name of a gaussian input file
+# $2 OUT number of processing cores requested 
+function getProcs {
+	local file="$1"
+	local __procs="$2"
+
+	local prcs
+
+	# Parse CPU and memory request from input file
+	prcs=`grep -i %NProcShared $file | cut -d'=' -f2 | tr -d '[:space:]'`
+
+	if [ -z "$prcs" ]; then
+		echo "No %NProcShared line found in $file.  Requesting $DEFAULTPROCS."
+		prcs=$DEFAULTPROCS
+	fi
+
+	if [ $prcs -le 0 ] || [ $prcs -gt $MAXPROCS ]; then
+    	echo
+		echo "$prcs processors requested in $file."
+    	echo "Number of processors must be at least 1 and no larger than $MAXPROCS."
+		usage
+		exit 1
+	fi  
+
+	# "return"
+	eval $__procs="'$prcs'"
+}
+
+# Parse memory and processor requirements from Gaussian input file
+# Gaussian requests processors with %NProcShared=X and memory with %Mem=Y
+# Memory requests are for the entire job, not per processing core
+#
+# $1 IN name of a gaussian input file
+# $2 OUT number of processing cores requested 
+# $3 OUT per core memory (as a SGE-friendly string, eg 2G, 512M, etc)
+function parseInput {
+	local file="$1"
+	local __procs="$2"
+	local __mem="$3"
+
+	local procs
+	local mem
+
+	getProcs $file procs
+	getMem $file $procs mem
+
+    # "return"
+	eval $__procs="'$procs'"
+	eval $__mem="'$mem'"
+}
+
+### MAIN #####################################################################################
+# $1 IN Gaussian input file name
+function main {
+	local input
+	local scr
+	local scrUnit
+	local scrAmt
+	local scrpp
+	local tag
+	local nprocs
+	local mempp
+	local command
+	local jobname
+	local filename
+	local emailargs
+
+	# We need at least one arg
+	if [ $# -eq 0 ]; then
+         echo "You must specify a Gaussian input file."
+   	     usage
+   	     exit 1
+	fi
+
+	# First arg must be a file
+	if ! [ -a $1 ]; then
+        echo
+       	echo "$1 is not a file!"
+    	echo
+    	usage
+        exit 1
+	fi
+	input=$1
+	shift
+
+# Output file name, assume most input will be named .com
+# myfile.com becomes myfile.out
+# myfile.txt becomes myfile.txt.out
+	case $input in
+		*.com )
+			output=${input/%.com/.out}
+		;;
+		* )
+			output=${input}.out
+		;;
+	esac
+
+	scr="$DEFAULTSCR"
+	# Check for getopts style args
+	while getopts "s:" tag; do
+		case $tag in
+		s)
+			scr="$OPTARG"
+		;;
+		esac
+	done
+	# convert scratch arg to all uppercase, strip trailing B
+    scr=`echo "$scr" | tr '[:lower:]' '[:upper:]' | sed 's/B$//g'`
+	scrUnit=`echo $scr | tr -d '[:digit:]'`
+	scrAmt=`echo $scr | tr -d '[:alpha:]'`
+
+	parseInput $input nprocs mempp
+	scrpp=`echo "scale=1;$scrAmt/$nprocs" | /usr/bin/bc`$scrUnit
+	echo "Requesting $nprocs processors and $mempp memory per processor."
+	echo "Requesting $scr scratch disk."
+
+	if [ -z "$g09root" ]; then
+		echo '$g09root not set, Sourcing /share/apps/g09/g09.sh'
+		source /share/apps/g09/g09.sh
+	fi
+
+	# g09.sh sets GAUSS_SCRDIR to /scratch/$USER for interactive jobs
+	# reset it here to include the job id to ease cleanup by sge epilog
+	command="export GAUSS_SCRDIR=/scratch/$USER/\$JOB_ID; g09 <$input >$output"
+	jobname="Gaussian-$USER"
+
+	filename="$jobname-\$JOB_ID"
+
+	if [ ! -z $JOB_EMAIL ]; then
+   		emailargs="-M $JOB_EMAIL -m eas"
+	fi
+
+	# Submit the job
+	# -pe smp 8 specify smp parallel environment, and num procs to use
+	# -M $email, send mail to $email
+	# -m eas, only send mail upon exit, abort, suspend
+	# -N job name
+	# -cwd execute in current working directory
+	# -V export environment variables to the context of the scheduled job
+	# -o standard out file
+	# -e standard error file
+	# -b y ==> command is not a job script but rather a binary executable
+
+	echo "Submitting job"
+	# resources requested with -l are per-processor
+	qsub -pe threaded $nprocs -l mem_free=$mempp -l scratch_free=$scrpp -S /bin/sh $emailargs -N $jobname -cwd -V -o $filename.out -e $filename.err -b y $command
+}
+
+main $*
+

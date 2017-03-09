@@ -1,0 +1,84 @@
+#!/bin/bash
+# $Id$
+# $Name$
+#
+# Schedules a mrbayes-multi job on comupte node(s)
+# mrbayes-multi is the mpi-aware version of mrbayes
+
+# Max number of procs allowed for a single submission
+MAXPROCS=16
+
+# Default number of procs used if num procs not specified or invalid
+DEFAULTPROCS=4
+
+# Print program usage syntax and examples
+function usage {
+	echo "You must specify an input file and (optionally) the number of processors"
+	echo
+        echo "usage: $0 <input file>"
+        echo "   OR: $0 <input file> <num proc>"
+	echo "If the number of processors is not specified or is greater than $MAXPROCS, $DEFAULTPROCS processors are used."
+        echo
+        echo "EXAMPLES"
+	echo "To run mrbayes on the file /opt/Bio/mrbayes/primates.nex:"
+	echo "$0 /opt/Bio/mrbayes/primates.nex"
+	echo
+	echo "To run mrbayes on the file MyNexFile.nex using 6 processors:"
+        echo "$0 MyNexFile.nex 6"
+}
+
+# We need at least one arg
+if [ $# -eq 0 ]; then
+	usage
+	exit 1
+fi
+
+# First arg must be a file
+if ! [ -a $1 ]; then
+	echo
+	echo "$1 is not a file!"
+	echo
+	usage
+	exit 1
+fi
+input=$1
+
+# Second arg, if present, specifies the number of processors to use
+nprocs=$DEFAULTPROCS
+if [ $2 ]; then
+	if [ $2 -gt 0 ] && [ $2 -le $MAXPROCS ]; then
+		nprocs=$2
+	else
+		echo
+		echo "Number of processors must be between 0 and $MAXPROCS"
+		echo
+		usage
+		exit 1
+	fi
+fi
+
+###command="mpirun -np $nprocs -machinefile \$TMPDIR/machines /share/apps/mrbayes-multi/mb-multi $input"
+command="mpirun -np $nprocs /share/apps/mrbayes-multi/mb-multi $input"
+jobname="mrbayes-multi-$USER"
+
+filename="$jobname-\$JOB_ID"
+
+# Users who wish to be emailed upon job completion/abort/suspend must set $EMAIL in eg bash_profile
+if [ $EMAIL ]
+then
+	emailargs="-M $EMAIL -m eas"
+fi
+
+# Submit the job
+# -pe mpi 8, specify mpi version to run, and num procs to use
+# -M $email, send mail to $email
+# -m eas, only send mail upon exit, abort, suspend
+# -N job name
+# -cwd execute in current working directory
+# -V export environment variables to the context of the scheduled job
+# -o standard out file
+# -e standard error file
+# -b y ==> command is not a job script but rather a binary executable
+
+#qsub -pe mpich $nprocs -S /bin/sh $emailargs -N $jobname -cwd -V -o $filename.out -e $filename.err -b y $command
+qsub -pe orte $nprocs -S /bin/sh $emailargs -N $jobname -cwd -V -o $filename.out -e $filename.err -b y $command

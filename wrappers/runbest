@@ -1,0 +1,85 @@
+#!/bin/bash
+# $Id$
+# $Name$
+#
+# Schedules a best job on comupte node(s)
+# best is built with mpi capabilities and may utilize more than one 
+# processing unit
+
+# Max number of procs allowed for a single submission
+MAXPROCS=16
+
+# Default number of procs used if num procs not specified or invalid
+DEFAULTPROCS=4
+
+# Print program usage syntax and examples
+function usage {
+	echo "You must specify an input file and (optionally) the number of processors"
+	echo
+        echo "usage: $0 <input file>"
+        echo "   OR: $0 <input file> <num proc>"
+	echo "The input file must reside in the same directory from which this command is run."
+	echo "If the number of processors is not specified or is greater than $MAXPROCS, $DEFAULTPROCS processors are used."
+	echo "NOTE: When using more than one processor, ensure the number of chains in your .nex file is at least as large as the number of processors specified."
+        echo
+        echo "EXAMPLES"
+	echo "To run best on the file finchv2_0.nex:"
+	echo "$0 finchv2_0.nex"
+	echo
+	echo "To run best on the file MyNexFile.nex using 4 processors:"
+        echo "$0 MyNexFile.nex 4"
+}
+
+# We need at least one arg
+if [ $# -eq 0 ]; then
+	usage
+	exit 1
+fi
+
+# First arg must be a file
+if ! [ -a $1 ]; then
+	echo
+	echo "$1 is not a file!"
+	echo
+	usage
+	exit 1
+fi
+input=$1
+
+# Second arg, if present, specifies the number of processors to use
+nprocs=$DEFAULTPROCS
+if [ $2 ]; then
+	if [ $2 -gt 0 ] && [ $2 -le $MAXPROCS ]; then
+		nprocs=$2
+	else
+		echo
+		echo "Number of processors must be between 0 and $MAXPROCS"
+		echo
+		usage
+		exit 1
+	fi
+fi
+
+command="mpirun -np $nprocs /share/apps/best/best $input"
+jobname="best-$USER"
+
+filename="$jobname-\$JOB_ID"
+
+# Users who wish to be emailed upon job completion/abort/suspend must set $EMAIL in eg bash_profile
+if [ $EMAIL ]
+then
+	emailargs="-M $EMAIL -m eas"
+fi
+
+# Submit the job
+# -pe mpi 8, specify mpi version to run
+# -M $email, send mail to $email
+# -m eas, only send mail upon exit, abort, suspend
+# -N job name
+# -cwd execute in current working directory
+# -V export environment variables to the context of the scheduled job
+# -o standard out file
+# -e standard error file
+# -b y ==> command is not a job script but rather a binary executable
+
+qsub -pe orte $nprocs -S /bin/bash $emailargs -N $jobname -cwd -V -o $filename.out -e $filename.err -b y $command

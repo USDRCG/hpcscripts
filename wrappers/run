@@ -1,0 +1,27 @@
+#!/bin/bash
+# $Id$
+# $Name$
+#
+# Schedules a command to run on a comupte node
+
+command="$*"
+jobname="$USER"
+filename="$USER-\$JOB_ID"
+if [ $JOB_EMAIL ]
+then
+	emailargs="-M $JOB_EMAIL -m eas"
+fi
+
+# Submit the job
+# -M $email, send mail to $email
+# -m eas, only send mail upon exit, abort, suspend
+# -N job name
+# -cwd execute in current working directory
+# -V export environment variables to the context of the scheduled job
+# -o standard out file
+# -e standard error file
+# -b y ==> command is not a job script but rather a binary executable
+
+export PATH=$PWD:$PATH
+#qsub -pe threaded 1 -S /bin/bash $emailargs -N $jobname -cwd -V -o $filename.out -e $filename.err -b y $command
+qsub -S /bin/bash $emailargs -N $jobname -cwd -V -o $filename.out -e $filename.err -b y $command

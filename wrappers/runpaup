@@ -1,0 +1,80 @@
+#!/bin/bash
+# $Id$
+# $Name$
+#
+# Schedules a paup job on a comupte node
+
+
+MAXMEM=128 #GB
+DEFAULTMEM=1 #GB
+
+function usage() {
+	cmd=$(basename $0)
+
+	echo "You must specify a .nex file containing a paup block (\"begin paup\")"
+	echo
+	echo "usage: $cmd <nex file>"
+	echo "   OR: $cmd <nex file> <memory>"
+	echo "where <memory> is the requested memory for the job, in GB. If the job consumes more memory than specified it will be cancelled."
+	echo "If memory is not specified, or greater than ${MAXMEM}GB, ${DEFAULTMEM}GB is requested."
+	echo
+	echo "EXAMPLES: $cmd /share/apps/paup/Sample_NEXUS_data/primate-mtDNA.nex"
+	echo "          $cmd foo.nex"
+	echo
+	echo "To run paup on the file MyFile.nex using 8GB of memory:"
+	echo "	$cmd MyFile.nex 8"	
+}
+
+# need at least 1 arg
+if [ $# -eq 0 ]
+then
+	usage
+	exit 1
+fi
+
+# First arg must be a file
+if ! [ -a $1 ]; then
+    echo
+    echo "$1 is not a file."
+    echo
+    usage
+    exit 1
+fi
+input=$1
+
+mem=$DEFAULTMEM
+if [ $2 ]; then
+	if [ $2 -gt 0 ] && [ $2 -le $MAXMEM ]; then
+		mem=$2
+	else
+		echo
+		echo "Memory amount must be between $DEFAULTMEM and $MAXMEM GB"
+		echo
+		usage
+		exit 1
+	fi
+fi
+
+paup=/share/apps/paup/paup
+command="$paup -n $input"
+jobname="paup-$USER"
+
+filename="$jobname-\$JOB_ID"
+if [ $JOB_EMAIL ]
+then
+	emailargs="-M $JOB_EMAIL -m eas"
+fi
+
+# Submit the job
+# -M $email, send mail to $email
+# -m eas, only send mail upon exit, abort, suspend
+# -N job name
+# -cwd execute in current working directory
+# -V export environment variables to the context of the scheduled job
+# -o standard out file
+# -e standard error file
+# -b y ==> command is not a job script but rather a binary executable
+
+#echo qsub -pe orte 1 -l mem_free=${mem}G,h_vmem=${mem}G -S /bin/sh $emailargs -N $jobname -cwd -V -o $filename.out -e $filename.err -b y $command
+qsub -pe orte 1 -l mem_free=${mem}G,h_vmem=${mem}G -S /bin/sh $emailargs -N $jobname -cwd -V -o $filename.out -e $filename.err -b y $command
+
