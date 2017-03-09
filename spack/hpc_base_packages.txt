@@ -1,0 +1,5 @@
+r@3.3.2
+r-biocinstaller
+gcc@4.9.4
+python@2.7
+py-biopython
