@@ -48,5 +48,5 @@ fi
 echo "Adding user $USERNAME with USERID $USERID and GROUPID $GROUPID"
 
 groupadd $USERNAME --gid $GROUPID
-useradd  --shell /sbin/nologin --no-create-home --gid $GROUPID --uid $USERID $USERNAME
+useradd  --shell /sbin/nologin -d /mnt/hpc/home/$USERNAME --no-create-home --gid $GROUPID --uid $USERID $USERNAME
 
