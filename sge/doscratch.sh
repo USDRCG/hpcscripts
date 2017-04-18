@@ -4,9 +4,12 @@ mode="$1"
 username="$2"
 jobid="$3"
 
+
 [ $# -ne 3 ] && exit 1
 
-SCRATCH="/scratch/$username/$jobid"
+export SCRATCH="/scratch/$username/$jobid/FOO"
+
+
 if [ "$SGE_TASK_ID" != "undefined" ]; then
         SCRATCH=$SCRATCH.$SGE_TASK_ID
 fi

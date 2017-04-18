@@ -11,8 +11,10 @@ useradd -p '*' -M -d /home/$username $username
 #for access to gaussian:
 #useradd -p '*' -M -G gaussian -d /home/$username $username
 
-uid=`grep $username /etc/passwd | cut -d: -f3`
-gid=$uid
+#uid=`grep $username /etc/passwd | cut -d: -f3`
+#gid=$uid
+uid=`id -u $username`
+gid=`id -g $username`
 
 echo "$username	nfs-nile:/export/home/$username" >>/etc/auto.home
 
