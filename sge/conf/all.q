@@ -15,7 +15,7 @@ rerun                 FALSE
 slots                 1,[compute-0-17.local=8],[compute-0-31.local=32], \
                       [compute-0-24.local=24]
 tmpdir                /tmp
-shell                 /bin/csh
+shell                 /bin/bash
 prolog                NONE
 epilog                NONE
 shell_start_mode      posix_compliant
