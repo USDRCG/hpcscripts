@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Diffing account files on login node with rio"
+echo "Diffing account files on login node with head node"
 # arrows will point at entries from the second file, rio's
 # >
 

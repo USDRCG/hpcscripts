@@ -8,4 +8,5 @@ EOF
 
 echo ttyS0 >>/etc/securetty
 
-sed /boot/grub/grub.conf  -i -e '/^kernel/ s|$| console=tty0 console=ttyS0,115200|'
+sed /boot/grub/grub.conf  -i -e '/^\s\+kernel/ s|$| console=tty0 console=ttyS0,115200|'
+sed /boot/grub/grub.conf  -i -e 's/rhgb quiet//g'

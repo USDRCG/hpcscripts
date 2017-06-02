@@ -19,7 +19,7 @@
 
 num="$1"
 
-storage_ip=$((251-$num))
+storage_ip=$((250-$num))
 compute_ip=$(())
 
 
@@ -31,22 +31,18 @@ echo "Once the node is installed, run:"
 echo "rocks set host sec_attr compute-0-$num attr=root_pw"
 echo "rocks sync host sec_attr compute-0-$num"
 echo
-echo "ssh compute-0-$num /share/apps/hpcscripts/migration/enable-serial-console.sh"
-echo
-echo "rocks set host interface ip compute-0-$num iface=eth2 ip=172.20.151.$storage_ip"
-echo "rocks set host interface subnet compute-0-$num iface=eth2 subnet=storage"
 echo "rocks list host interface compute-0-$num | grep private | awk '{ print \$4}'"
 echo "rocks set host interface ip compute-0-$num iface=eth0 ip=XXX"
 echo "rocks set host interface subnet compute-0-$num iface=eth0 subnet=private"
-
+echo "rocks set host interface ip compute-0-$num iface=eth2 ip=172.20.151.$storage_ip"
+echo "rocks set host interface subnet compute-0-$num iface=eth2 subnet=storage"
 echo
-echo "rocks set host bootflags compute-0-$num flags=\"console=tty0 console=ttyS0,115200\""
-echo "rocks set host installaction compute-0-$num action=\"install remcons\""
-echo
-
+echo "rocks sync host network compute-0-$num"
 echo
 echo "NOTE: Arrange compute and storage network cables."
 echo
-echo "rocks sync host network compute-0-$num"
+echo "ssh compute-0-$num /share/apps/hpcscripts/migration/enable-serial-console.sh"
+echo "rocks set host bootflags compute-0-$num flags=\"console=tty0 console=ttyS0,115200\""
+echo "rocks set host installaction compute-0-$num action=\"install remcons\""
+echo
 echo "ssh compute-0-$num \"/boot/kickstart/cluster-kickstart\""
-
