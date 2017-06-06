@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Diffing account files on login node with head node"
-# arrows will point at entries from the second file, rio's
+# arrows will point at entries from the second file, head node's
 # >
 
 echo
@@ -9,6 +9,6 @@ echo
 for fn in passwd group shadow sudoers auto.home; do
 	file=/etc/$fn	
 	echo "--- $file ---"
-	ssh login-0-0 "cat $file" | diff - $file
+	ssh login-0-0 "cat $file" | diff - "$file" | diff - "diffs/$fn.expected"
 	echo
 done

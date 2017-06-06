@@ -283,9 +283,7 @@ function main {
 		source /share/apps/g09/g09.sh
 	fi
 
-	# g09.sh sets GAUSS_SCRDIR to /scratch/$USER for interactive jobs
-	# reset it here to include the job id to ease cleanup by sge epilog
-	command="export GAUSS_SCRDIR=/scratch/$USER/\$JOB_ID; g09 <$input >$output"
+	command="g09 <$input >$output"
 	jobname="Gaussian-$USER"
 
 	filename="$jobname-\$JOB_ID"

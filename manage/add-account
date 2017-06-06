@@ -40,8 +40,8 @@ EOF
 echo "Setting up dotfiles"
 su - $username -c "cp -R /etc/skel/.??* ~"
 
-echo "Testing node connectivity"
-su - $username -c "cluster-fork hostname"
+#echo "Testing node connectivity"
+#su - $username -c "cluster-fork hostname"
 
 echo "$username added with group $groupname uid:gid=$uid:$gid"
 echo
