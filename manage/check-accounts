@@ -9,6 +9,6 @@ echo
 for fn in passwd group shadow sudoers auto.home; do
 	file=/etc/$fn	
 	echo "--- $file ---"
-	ssh login-0-0 "cat $file" | diff - "$file" | diff - "diffs/$fn.expected"
+	ssh login-0-0 "cat $file" | diff - "$file" | diff - "/root/manage/diffs/$fn.expected"
 	echo
 done
